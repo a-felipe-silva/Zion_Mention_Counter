@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dias sem mencionar</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Archivo+Black&display=swap');
+
+  :root {
+    --safety-yellow: #F5C400;
+    --safety-black: #1A1A1A;
+    --warn-red: #C1272D;
+    --off-white: #F2EFE6;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      repeating-linear-gradient(
+        135deg,
+        var(--safety-black),
+        var(--safety-black) 26px,
+        var(--safety-yellow) 26px,
+        var(--safety-yellow) 52px
+      );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+    font-family: 'Oswald', sans-serif;
+  }
+
+  .board {
+    background: var(--off-white);
+    border: 10px solid var(--safety-black);
+    border-radius: 6px;
+    max-width: 680px;
+    width: 100%;
+    padding: 44px 36px 36px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+    position: relative;
+  }
+
+  .board::before {
+    content: "AVISO";
+    position: absolute;
+    top: -18px;
+    left: 32px;
+    background: var(--warn-red);
+    color: var(--off-white);
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 13px;
+    letter-spacing: 3px;
+    padding: 6px 14px;
+    border-radius: 3px;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.3);
+  }
+
+  .headline {
+    font-family: 'Archivo Black', sans-serif;
+    color: var(--safety-black);
+    font-size: clamp(20px, 4.4vw, 30px);
+    line-height: 1.3;
+    text-align: center;
+    margin: 10px 0 6px;
+  }
+
+  .subline {
+    text-align: center;
+    color: var(--warn-red);
+    font-weight: 600;
+    font-size: clamp(14px, 2.6vw, 17px);
+    letter-spacing: 0.5px;
+    margin-bottom: 30px;
+  }
+
+  .names {
+    text-align: center;
+    font-weight: 500;
+    color: var(--safety-black);
+  }
+
+  .divider {
+    height: 4px;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--safety-black),
+      var(--safety-black) 18px,
+      var(--safety-yellow) 18px,
+      var(--safety-yellow) 36px
+    );
+    margin: 30px 0;
+    border-radius: 2px;
+  }
+
+  .counter-wrap {
+    text-align: center;
+  }
+
+  .counter-label {
+    font-size: 13px;
+    letter-spacing: 4px;
+    color: #555;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .counter {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: clamp(90px, 22vw, 150px);
+    line-height: 1;
+    color: var(--warn-red);
+    text-shadow: 4px 4px 0 var(--safety-black);
+    letter-spacing: 2px;
+  }
+
+  .counter-clock {
+    margin-top: 10px;
+    font-family: 'Archivo Black', sans-serif;
+    font-size: clamp(16px, 3.2vw, 22px);
+    letter-spacing: 3px;
+    color: var(--safety-black);
+  }
+
+  .counter-sub {
+    margin-top: 12px;
+    font-size: 15px;
+    color: var(--safety-black);
+    font-weight: 500;
+  }
+
+  .footer-note {
+    margin-top: 34px;
+    text-align: center;
+    font-size: 12px;
+    color: #777;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+  <div class="board">
+    <div class="headline">DIAS SEM MENCIONAR</div>
+    <div class="names">
+      Zion Church &middot; Teo Hayashi &middot; Nick Moretti &middot; Shaba<br>
+      e assuntos correlatos
+    </div>
+    <div class="subline" id="recordLine">recorde anterior: nenhum</div>
+
+    <div class="divider"></div>
+
+    <div class="counter-wrap">
+      <div class="counter-label">contador atual</div>
+      <div class="counter" id="counter" aria-live="polite">0</div>
+      <div class="counter-clock" id="counterClock">00:00:00</div>
+      <div class="counter-sub" id="counterSub">começou hoje</div>
+    </div>
+
+    <div class="footer-note">MANTENHA A DISTÂNCIA DO ASSUNTO</div>
+  </div>
+
+  <script>
+    // Static GitHub Pages counter: the number is derived from ORIGIN.
+    // To reset for everyone, set PREVIOUS_RECORD to the old streak,
+    // change ORIGIN to today (America/Sao_Paulo), and push.
+    const ORIGIN = '2026-08-25T00:00:00-03:00';
+    const PREVIOUS_RECORD = 0;
+    const TZ = 'America/Sao_Paulo';
+
+    const counterEl = document.getElementById('counter');
+    const clockEl = document.getElementById('counterClock');
+    const subEl = document.getElementById('counterSub');
+    const recordEl = document.getElementById('recordLine');
+
+    const dayParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+
+    const timeParts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: TZ,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+
+    function ymdInTZ(date) {
+      return dayParts.format(date);
+    }
+
+    function calendarDaysBetween(originIso) {
+      const originDay = ymdInTZ(new Date(originIso));
+      const today = ymdInTZ(new Date());
+      const utc = (ymd) => Date.parse(ymd + 'T00:00:00Z');
+      return Math.max(0, Math.round((utc(today) - utc(originDay)) / 86_400_000));
+    }
+
+    function recordLabel(record) {
+      if (!record) return 'recorde anterior: nenhum';
+      if (record === 1) return 'recorde anterior: 1 dia';
+      return 'recorde anterior: ' + record + ' dias';
+    }
+
+    function tick() {
+      const days = calendarDaysBetween(ORIGIN);
+      counterEl.textContent = String(days);
+      clockEl.textContent = timeParts.format(new Date());
+      subEl.textContent = days === 0
+        ? 'começou hoje'
+        : (days === 1 ? '1 dia consecutivo' : days + ' dias consecutivos');
+    }
+
+    recordEl.textContent = recordLabel(PREVIOUS_RECORD);
+    tick();
+    setInterval(tick, 1000);
+  </script>
+</body>
+</html>
