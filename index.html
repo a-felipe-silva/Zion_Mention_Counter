@@ -140,6 +140,120 @@
     color: #777;
     letter-spacing: 1px;
   }
+
+  .person-line {
+    text-align: center;
+    color: var(--safety-black);
+    font-weight: 500;
+    font-size: clamp(13px, 2.4vw, 16px);
+    margin: -18px 0 28px;
+  }
+
+  .person-line:empty {
+    display: none;
+  }
+
+  .reset-wrap {
+    margin-top: 22px;
+    text-align: center;
+  }
+
+  .reset-toggle {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: #999;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .reset-toggle:hover,
+  .reset-toggle:focus-visible {
+    color: var(--safety-black);
+  }
+
+  .reset-form {
+    margin-top: 16px;
+    text-align: left;
+    background: #fff;
+    border: 3px solid var(--safety-black);
+    border-radius: 4px;
+    padding: 16px;
+  }
+
+  .reset-form[hidden] {
+    display: none;
+  }
+
+  .reset-form label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #555;
+    margin-bottom: 6px;
+  }
+
+  .reset-form input {
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border: 2px solid var(--safety-black);
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 16px;
+    background: var(--off-white);
+  }
+
+  .reset-form input:focus {
+    outline: 3px solid var(--safety-yellow);
+    outline-offset: 1px;
+  }
+
+  .reset-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .reset-form button {
+    font-family: inherit;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-size: 12px;
+    padding: 10px 14px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+
+  .reset-cancel {
+    background: transparent;
+    border: 2px solid #999;
+    color: #555;
+  }
+
+  .reset-submit {
+    background: var(--warn-red);
+    border: 2px solid var(--safety-black);
+    color: var(--off-white);
+  }
+
+  .reset-form button:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+
+  .reset-status {
+    margin: 10px 0 0;
+    min-height: 1.2em;
+    font-size: 13px;
+    color: var(--warn-red);
+    text-align: center;
+  }
 </style>
 </head>
 <body>
@@ -151,6 +265,7 @@
       e assuntos correlatos
     </div>
     <div class="subline" id="recordLine">recorde anterior: nenhum</div>
+    <div class="person-line" id="personLine"></div>
 
     <div class="divider"></div>
 
@@ -162,20 +277,59 @@
     </div>
 
     <div class="footer-note">MANTENHA A DISTÂNCIA DO ASSUNTO</div>
+
+    <div class="reset-wrap">
+      <button type="button" class="reset-toggle" id="resetToggle">registrar menção</button>
+      <form class="reset-form" id="resetForm" hidden>
+        <label for="personInput">quem mencionou</label>
+        <input id="personInput" name="person" type="text" autocomplete="name" required>
+
+        <label for="writeKeyInput">chave de escrita (JSONBin master key)</label>
+        <input id="writeKeyInput" name="writeKey" type="password" autocomplete="off" required>
+
+        <div class="reset-actions">
+          <button type="button" class="reset-cancel" id="resetCancel">cancelar</button>
+          <button type="submit" class="reset-submit" id="resetSubmit">zerar contador</button>
+        </div>
+      </form>
+      <p class="reset-status" id="resetStatus" hidden></p>
+    </div>
   </div>
 
   <script>
-    // Static GitHub Pages counter: the number is derived from ORIGIN.
-    // To reset for everyone, set PREVIOUS_RECORD to the old streak,
-    // change ORIGIN to today (America/Sao_Paulo), and push.
-    const ORIGIN = '2026-08-25T00:00:00-03:00';
-    const PREVIOUS_RECORD = 0;
+    // Private JSONBin: paste the bin id and a READ-ONLY access key.
+    // Create the access key at jsonbin.io → API Keys → Access Keys
+    // with Bins Read on, and Update/Create/Delete off.
+    // The master key is typed in the reset form and is never stored here.
+    const JSONBIN = {
+      binId: '6a8db4feda38895dfe0f2ccb',
+      accessKey: '$2a$10$CO6Of9Zb2c68YNzfr7HomuoGWxex3MvoCe6ziUGzW4iLiLgkv6qDG'
+    };
+
+    const FALLBACK = {
+      origin: '2026-08-25T00:00:00-03:00',
+      previousRecord: 0,
+      lastPerson: ''
+    };
+
     const TZ = 'America/Sao_Paulo';
+    const WRITE_KEY_STORAGE = 'zionCounter.writeKey';
 
     const counterEl = document.getElementById('counter');
     const clockEl = document.getElementById('counterClock');
     const subEl = document.getElementById('counterSub');
     const recordEl = document.getElementById('recordLine');
+    const personEl = document.getElementById('personLine');
+    const resetToggle = document.getElementById('resetToggle');
+    const resetForm = document.getElementById('resetForm');
+    const resetCancel = document.getElementById('resetCancel');
+    const resetSubmit = document.getElementById('resetSubmit');
+    const resetStatus = document.getElementById('resetStatus');
+    const personInput = document.getElementById('personInput');
+    const writeKeyInput = document.getElementById('writeKeyInput');
+
+    let state = { ...FALLBACK };
+    let loadToken = 0;
 
     const dayParts = new Intl.DateTimeFormat('en-CA', {
       timeZone: TZ,
@@ -184,16 +338,24 @@
       day: '2-digit'
     });
 
-    const timeParts = new Intl.DateTimeFormat('en-GB', {
-      timeZone: TZ,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-
     function ymdInTZ(date) {
       return dayParts.format(date);
+    }
+
+    function pad2(value) {
+      return String(value).padStart(2, '0');
+    }
+
+    function elapsedClock(originIso) {
+      const originMs = new Date(originIso).getTime();
+      const elapsedMs = Number.isFinite(originMs)
+        ? Math.max(0, Date.now() - originMs)
+        : 0;
+      const totalSeconds = Math.floor(elapsedMs / 1000);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      return pad2(hours) + ':' + pad2(minutes) + ':' + pad2(seconds);
     }
 
     function calendarDaysBetween(originIso) {
@@ -203,24 +365,180 @@
       return Math.max(0, Math.round((utc(today) - utc(originDay)) / 86_400_000));
     }
 
+    function nowOriginIso() {
+      const parts = {};
+      for (const part of new Intl.DateTimeFormat('en-US', {
+        timeZone: TZ,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23',
+        hour12: false
+      }).formatToParts(new Date())) {
+        if (part.type !== 'literal') parts[part.type] = part.value;
+      }
+      return parts.year + '-' + parts.month + '-' + parts.day +
+        'T' + parts.hour + ':' + parts.minute + ':' + parts.second + '-03:00';
+    }
+
     function recordLabel(record) {
       if (!record) return 'recorde anterior: nenhum';
       if (record === 1) return 'recorde anterior: 1 dia';
       return 'recorde anterior: ' + record + ' dias';
     }
 
+    function personLabel(name) {
+      const trimmed = (name || '').trim();
+      return trimmed ? 'última menção: ' + trimmed : '';
+    }
+
+    function binConfigured() {
+      return Boolean(JSONBIN.binId && JSONBIN.accessKey);
+    }
+
+    function binUrl(suffix) {
+      return 'https://api.jsonbin.io/v3/b/' + JSONBIN.binId + suffix;
+    }
+
+    function setStatus(message) {
+      if (!message) {
+        resetStatus.hidden = true;
+        resetStatus.textContent = '';
+        return;
+      }
+      resetStatus.hidden = false;
+      resetStatus.textContent = message;
+    }
+
+    function applyState(next) {
+      state = {
+        origin: next.origin || FALLBACK.origin,
+        previousRecord: Number(next.previousRecord) || 0,
+        lastPerson: next.lastPerson || ''
+      };
+      recordEl.textContent = recordLabel(state.previousRecord);
+      personEl.textContent = personLabel(state.lastPerson);
+      tick();
+    }
+
     function tick() {
-      const days = calendarDaysBetween(ORIGIN);
+      const days = calendarDaysBetween(state.origin);
       counterEl.textContent = String(days);
-      clockEl.textContent = timeParts.format(new Date());
+      clockEl.textContent = elapsedClock(state.origin);
       subEl.textContent = days === 0
         ? 'começou hoje'
         : (days === 1 ? '1 dia consecutivo' : days + ' dias consecutivos');
     }
 
-    recordEl.textContent = recordLabel(PREVIOUS_RECORD);
+    async function readError(res) {
+      try {
+        const body = await res.json();
+        return body.message || ('HTTP ' + res.status);
+      } catch (err) {
+        return 'HTTP ' + res.status;
+      }
+    }
+
+    async function loadFromBin() {
+      if (!binConfigured()) return FALLBACK;
+      const token = ++loadToken;
+      const res = await fetch(binUrl('/latest?meta=false'), {
+        cache: 'no-store',
+        headers: { 'X-Access-Key': JSONBIN.accessKey }
+      });
+      if (!res.ok) throw new Error(await readError(res));
+      const data = await res.json();
+      if (token !== loadToken) return null;
+      return data.record || data;
+    }
+
+    async function saveToBin(next, masterKey) {
+      loadToken += 1;
+      const res = await fetch(binUrl(''), {
+        method: 'PUT',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': masterKey,
+          'X-Bin-Versioning': 'false'
+        },
+        body: JSON.stringify(next)
+      });
+      if (!res.ok) throw new Error(await readError(res));
+    }
+
+    function openResetForm() {
+      writeKeyInput.value = sessionStorage.getItem(WRITE_KEY_STORAGE) || '';
+      resetForm.hidden = false;
+      setStatus('');
+      personInput.focus();
+    }
+
+    function closeResetForm() {
+      resetForm.hidden = true;
+      personInput.value = '';
+      if (!sessionStorage.getItem(WRITE_KEY_STORAGE)) writeKeyInput.value = '';
+    }
+
+    resetToggle.addEventListener('click', function () {
+      if (!resetForm.hidden) {
+        closeResetForm();
+        return;
+      }
+      if (!binConfigured()) {
+        setStatus('Cole o binId e a access key de leitura no JSONBIN do index.html.');
+        return;
+      }
+      openResetForm();
+    });
+
+    resetCancel.addEventListener('click', function () {
+      closeResetForm();
+      setStatus('');
+    });
+
+    resetForm.addEventListener('submit', async function (event) {
+      event.preventDefault();
+      const lastPerson = personInput.value.trim();
+      const masterKey = writeKeyInput.value.trim();
+      if (!lastPerson || !masterKey) return;
+
+      const ended = calendarDaysBetween(state.origin);
+      const next = {
+        origin: nowOriginIso(),
+        previousRecord: Math.max(state.previousRecord || 0, ended),
+        lastPerson: lastPerson
+      };
+
+      resetSubmit.disabled = true;
+      setStatus('salvando…');
+      try {
+        await saveToBin(next, masterKey);
+        sessionStorage.setItem(WRITE_KEY_STORAGE, masterKey);
+        applyState(next);
+        closeResetForm();
+        setStatus('contador zerado.');
+      } catch (err) {
+        setStatus('não deu para salvar: ' + err.message);
+      } finally {
+        resetSubmit.disabled = false;
+      }
+    });
+
+    applyState(FALLBACK);
     tick();
     setInterval(tick, 1000);
+
+    loadFromBin()
+      .then(function (remote) {
+        if (remote) applyState(remote);
+      })
+      .catch(function (err) {
+        setStatus('não deu para ler o JSONBin: ' + err.message);
+      });
   </script>
 </body>
 </html>
