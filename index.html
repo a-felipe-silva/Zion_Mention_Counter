@@ -174,9 +174,7 @@
   }
 
   .names.is-censored {
-    filter: blur(9px);
     user-select: none;
-    pointer-events: none;
   }
 
   .person-block {
@@ -588,7 +586,15 @@
     });
 
     censorToggle.addEventListener('change', function () {
-      namesEl.classList.toggle('is-censored', censorToggle.checked);
+      const censored = censorToggle.checked;
+      namesEl.classList.toggle('is-censored', censored);
+      if (censored) {
+        namesEl.dataset.clear = namesEl.innerHTML;
+        namesEl.textContent = '*********';
+      } else if (namesEl.dataset.clear) {
+        namesEl.innerHTML = namesEl.dataset.clear;
+        delete namesEl.dataset.clear;
+      }
     });
 
     applyState(FALLBACK);
