@@ -141,16 +141,65 @@
     letter-spacing: 1px;
   }
 
-  .person-line {
+  .censor-bar {
+    position: fixed;
+    top: 14px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(242, 239, 230, 0.85);
+    cursor: pointer;
+    user-select: none;
+    z-index: 2;
+    background: rgba(26, 26, 26, 0.72);
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 2px solid var(--safety-black);
+  }
+
+  .censor-bar input {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--warn-red);
+    cursor: pointer;
+  }
+
+  .censor-bar:hover,
+  .censor-bar:focus-within {
+    color: var(--off-white);
+  }
+
+  .names.is-censored {
+    filter: blur(9px);
+    user-select: none;
+    pointer-events: none;
+  }
+
+  .person-block {
+    margin: -18px 0 28px;
     text-align: center;
+  }
+
+  .person-line {
     color: var(--safety-black);
     font-weight: 500;
     font-size: clamp(13px, 2.4vw, 16px);
-    margin: -18px 0 28px;
   }
 
   .person-line:empty {
     display: none;
+  }
+
+  .person-sub {
+    margin-top: 4px;
+    color: var(--warn-red);
+    font-weight: 600;
+    font-size: clamp(12px, 2.2vw, 14px);
+    letter-spacing: 0.5px;
   }
 
   .reset-wrap {
@@ -258,14 +307,22 @@
 </head>
 <body>
 
+  <label class="censor-bar" for="censorToggle">
+    <input type="checkbox" id="censorToggle">
+    censurar
+  </label>
+
   <div class="board">
     <div class="headline">DIAS SEM MENCIONAR</div>
-    <div class="names">
+    <div class="names" id="namesLine">
       Zion Church &middot; Teo Hayashi &middot; Nick Moretti &middot; Shaba<br>
       e assuntos correlatos
     </div>
     <div class="subline" id="recordLine">recorde anterior: nenhum</div>
-    <div class="person-line" id="personLine"></div>
+    <div class="person-block">
+      <div class="person-line" id="personLine"></div>
+      <div class="person-sub">Não dê nem água</div>
+    </div>
 
     <div class="divider"></div>
 
@@ -320,6 +377,8 @@
     const subEl = document.getElementById('counterSub');
     const recordEl = document.getElementById('recordLine');
     const personEl = document.getElementById('personLine');
+    const namesEl = document.getElementById('namesLine');
+    const censorToggle = document.getElementById('censorToggle');
     const resetToggle = document.getElementById('resetToggle');
     const resetForm = document.getElementById('resetForm');
     const resetCancel = document.getElementById('resetCancel');
@@ -392,7 +451,7 @@
 
     function personLabel(name) {
       const trimmed = (name || '').trim();
-      return trimmed ? 'última menção: ' + trimmed : '';
+      return trimmed ? 'Última menção: ' + trimmed : '';
     }
 
     function binConfigured() {
@@ -526,6 +585,10 @@
       } finally {
         resetSubmit.disabled = false;
       }
+    });
+
+    censorToggle.addEventListener('change', function () {
+      namesEl.classList.toggle('is-censored', censorToggle.checked);
     });
 
     applyState(FALLBACK);
